@@ -30,7 +30,7 @@ import matplotlib.cm as cm
 def corner(xs, weights=None, labels=None, extents=None, truths=None,
            truth_color="#4682b4", scale_hist=False, quantiles=[],
            verbose=True, plot_contours=True, plot_datapoints=True,
-           fig=None, **kwargs):
+           fig=None, angle=45, **kwargs):
     """
     Make a *sick* corner plot showing the projections of a data set in a
     multi-dimensional space. kwargs are passed to hist2d() or used for
@@ -83,6 +83,9 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
 
     fig : matplotlib.Figure (optional)
         Overplot onto the provided figure object.
+        
+    angle : float (optional)
+        Tilt axes labels by angle (degrees), default=45.
 
     """
 
@@ -179,7 +182,7 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
         if i < K - 1:
             ax.set_xticklabels([])
         else:
-            [l.set_rotation(45) for l in ax.get_xticklabels()]
+            [l.set_rotation(angle) for l in ax.get_xticklabels()]
             if labels is not None:
                 ax.set_xlabel(labels[i])
                 ax.xaxis.set_label_coords(0.5, -0.3)
@@ -209,7 +212,7 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
             if i < K - 1:
                 ax.set_xticklabels([])
             else:
-                [l.set_rotation(45) for l in ax.get_xticklabels()]
+                [l.set_rotation(angle) for l in ax.get_xticklabels()]
                 if labels is not None:
                     ax.set_xlabel(labels[j])
                     ax.xaxis.set_label_coords(0.5, -0.3)
@@ -217,7 +220,7 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
             if j > 0:
                 ax.set_yticklabels([])
             else:
-                [l.set_rotation(45) for l in ax.get_yticklabels()]
+                [l.set_rotation(angle) for l in ax.get_yticklabels()]
                 if labels is not None:
                     ax.set_ylabel(labels[i])
                     ax.yaxis.set_label_coords(-0.3, 0.5)
