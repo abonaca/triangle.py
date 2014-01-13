@@ -25,10 +25,11 @@ from matplotlib.ticker import MaxNLocator
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Ellipse
 import matplotlib.cm as cm
+from math import sin, radians
 
 
 def corner(xs, weights=None, labels=None, extents=None, truths=None,
-           truth_color="#4682b4", scale_hist=False, quantiles=[],
+           truth_color="#4682b4", truths_range=None, scale_hist=False, quantiles=[],
            verbose=True, plot_contours=True, plot_datapoints=True,
            fig=None, angle=45, **kwargs):
     """
@@ -159,6 +160,9 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
         if truths is not None:
             ax.axvline(truths[i], color=truth_color)
 
+        if truths_range is not None:
+	    ax.fill_betweenx(y=[0,1e6],x1=truths_range[i][0], x2=truths_range[i][1], color=truth_color, alpha=0.1)
+
         # Plot quantiles if wanted.
         if len(quantiles) > 0:
             qvalues = quantile(x, quantiles, weights=weights)
@@ -178,6 +182,9 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
         ax.set_yticklabels([])
         ax.xaxis.set_major_locator(MaxNLocator(5))
 
+	# label offset
+	loff=-0.2-sin(radians(angle))/7.
+
         # Not so DRY.
         if i < K - 1:
             ax.set_xticklabels([])
@@ -185,7 +192,7 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
             [l.set_rotation(angle) for l in ax.get_xticklabels()]
             if labels is not None:
                 ax.set_xlabel(labels[i])
-                ax.xaxis.set_label_coords(0.5, -0.3)
+                ax.xaxis.set_label_coords(0.5, loff)
 
         for j, y in enumerate(xs):
             ax = axes[i, j]
@@ -206,6 +213,12 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
                 ax.axvline(truths[j], color=truth_color)
                 ax.axhline(truths[i], color=truth_color)
 
+            y1,y2=extents[i]
+            x1,x2=extents[j]
+            if truths_range is not None:
+		ax.fill_betweenx(y=[y1,y2],x1=truths_range[j][0], x2=truths_range[j][1], color=truth_color, alpha=0.1)
+		ax.fill_between(x=[x1,x2],y1=truths_range[i][0], y2=truths_range[i][1], color=truth_color, alpha=0.1)
+
             ax.xaxis.set_major_locator(MaxNLocator(5))
             ax.yaxis.set_major_locator(MaxNLocator(5))
 
@@ -215,7 +228,7 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
                 [l.set_rotation(angle) for l in ax.get_xticklabels()]
                 if labels is not None:
                     ax.set_xlabel(labels[j])
-                    ax.xaxis.set_label_coords(0.5, -0.3)
+                    ax.xaxis.set_label_coords(0.5, loff)
 
             if j > 0:
                 ax.set_yticklabels([])
@@ -223,7 +236,7 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
                 [l.set_rotation(angle) for l in ax.get_yticklabels()]
                 if labels is not None:
                     ax.set_ylabel(labels[i])
-                    ax.yaxis.set_label_coords(-0.3, 0.5)
+                    ax.yaxis.set_label_coords(loff, 0.5)
 
     return fig
 
