@@ -30,8 +30,8 @@ from math import sin, radians
 
 def corner(xs, weights=None, labels=None, extents=None, truths=None,
            truth_color="#4682b4", truths_range=None, scale_hist=False, quantiles=[],
-           verbose=True, plot_contours=True, plot_datapoints=True,
-           fig=None, angle=45, **kwargs):
+           verbose=True, plot_contours=True, plot_datapoints=True, plot_hist2d=True,
+           fig=None, angle=45, alpha=0.1, **kwargs):
     """
     Make a *sick* corner plot showing the projections of a data set in a
     multi-dimensional space. kwargs are passed to hist2d() or used for
@@ -61,6 +61,9 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
 
     truths : iterable (ndim,) (optional)
         A list of reference values to indicate on the plots.
+    
+    truths_range :
+        A list of reference value ranges to indicate on the plots 
 
     truth_color : str (optional)
         A ``matplotlib`` style color for the ``truths`` makers.
@@ -81,12 +84,18 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
 
     plot_datapoints : bool (optional)
         Draw the individual data points.
+        
+    plot_hist2d : bool (optional)
+        Draw 2d histogram (default: True)
 
     fig : matplotlib.Figure (optional)
         Overplot onto the provided figure object.
         
     angle : float (optional)
         Tilt axes labels by angle (degrees), default=45.
+        
+    alpha : float (optional)
+        Transparency for plotting truths_range
 
     """
 
@@ -161,13 +170,16 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
             ax.axvline(truths[i], color=truth_color)
 
         if truths_range is not None:
-	    ax.fill_betweenx(y=[0,1e6],x1=truths_range[i][0], x2=truths_range[i][1], color=truth_color, alpha=0.1)
+	    ax.fill_betweenx(y=[0,1e6],x1=truths_range[i][0], x2=truths_range[i][1], color=truth_color, alpha=alpha, zorder=0)
 
         # Plot quantiles if wanted.
         if len(quantiles) > 0:
             qvalues = quantile(x, quantiles, weights=weights)
             for q in qvalues:
-                ax.axvline(q, ls="dashed", color=kwargs.get("color", "k"))
+		ax.axvline(q, ls="dashed", color=kwargs.get("color", "k"))
+	    a=quantiles.index(0.5)
+	    if a:
+		    ax.axvline(qvalues[a], ls="solid", color=kwargs.get("color", "k"))
             if verbose:
                 print("Quantiles:")
                 print(zip(quantiles, qvalues))
@@ -206,6 +218,7 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
             hist2d(y, x, ax=ax, extent=[extents[j], extents[i]],
                    plot_contours=plot_contours,
                    plot_datapoints=plot_datapoints,
+                   plot_hist2d=plot_hist2d,
                    weights=weights, **kwargs)
 
             if truths is not None:
@@ -216,8 +229,8 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
             y1,y2=extents[i]
             x1,x2=extents[j]
             if truths_range is not None:
-		ax.fill_betweenx(y=[y1,y2],x1=truths_range[j][0], x2=truths_range[j][1], color=truth_color, alpha=0.1)
-		ax.fill_between(x=[x1,x2],y1=truths_range[i][0], y2=truths_range[i][1], color=truth_color, alpha=0.1)
+		ax.fill_betweenx(y=[y1,y2],x1=truths_range[j][0], x2=truths_range[j][1], color=truth_color, alpha=alpha, zorder=10)
+		ax.fill_between(x=[x1,x2],y1=truths_range[i][0], y2=truths_range[i][1], color=truth_color, alpha=alpha, zorder=10)
 
             ax.xaxis.set_major_locator(MaxNLocator(5))
             ax.yaxis.set_major_locator(MaxNLocator(5))
@@ -298,11 +311,15 @@ def hist2d(x, y, *args, **kwargs):
     linewidths = kwargs.pop("linewidths", None)
     plot_datapoints = kwargs.get("plot_datapoints", True)
     plot_contours = kwargs.get("plot_contours", True)
+    plot_hist2d = kwargs.get("plot_hist2d", True)
+    nlevels = kwargs.get("nlevels", None)
+    cmap = kwargs.get("cmap", None)
 
-    cmap = cm.get_cmap("gray")
-    cmap._init()
-    cmap._lut[:-3, :-1] = 0.
-    cmap._lut[:-3, -1] = np.linspace(1, 0, cmap.N)
+    if cmap==None:
+	cmap = cm.get_cmap("gray")
+	cmap._init()
+	cmap._lut[:-3, :-1] = 0.
+	cmap._lut[:-3, -1] = np.linspace(1, 0, cmap.N)
 
     X = np.linspace(extent[0][0], extent[0][1], bins + 1)
     Y = np.linspace(extent[1][0], extent[1][1], bins + 1)
@@ -335,14 +352,15 @@ def hist2d(x, y, *args, **kwargs):
                 rasterized=True)
         if plot_contours:
             ax.contourf(X1, Y1, H.T, [V[-1], H.max()],
-                        cmap=LinearSegmentedColormap.from_list("cmap",
-                                                               ([1] * 3,
-                                                                [1] * 3),
-                        N=2), antialiased=False)
+                        cmap=LinearSegmentedColormap.from_list("cmap", ([1] * 3, [1] * 3), N=2), antialiased=False)
 
     if plot_contours:
-        ax.pcolor(X, Y, H.max() - H.T, cmap=cmap)
-        ax.contour(X1, Y1, H.T, V, colors=color, linewidths=linewidths)
+	if plot_hist2d:
+            ax.pcolor(X, Y, H.max() - H.T, cmap=cmap)
+        if nlevels==None:
+	    ax.contour(X1, Y1, H.T, V, colors=color, linewidths=linewidths)
+	elif nlevels>0:
+            ax.contour(X1, Y1, H.T, nlevels, colors=color, linewidths=linewidths)
 
     data = np.vstack([x, y])
     mu = np.mean(data, axis=1)
