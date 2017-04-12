@@ -31,7 +31,7 @@ from math import sin, radians
 def corner(xs, weights=None, labels=None, extents=None, truths=None,
            truth_color="#4682b4", truths_range=None, scale_hist=False, quantiles=[],
            verbose=True, plot_contours=True, plot_datapoints=True, plot_hist2d=True,
-           fig=None, angle=45, alpha=0.1, **kwargs):
+           plot_hist=True, fig=None, angle=45, alpha=0.1, **kwargs):
     """
     Make a *sick* corner plot showing the projections of a data set in a
     multi-dimensional space. kwargs are passed to hist2d() or used for
@@ -87,6 +87,9 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
         
     plot_hist2d : bool (optional)
         Draw 2d histogram (default: True)
+    
+    plot_hist : bool (optional)
+        Draw 1d histogram (default: True)
 
     fig : matplotlib.Figure (optional)
         Overplot onto the provided figure object.
@@ -163,14 +166,25 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
     for i, x in enumerate(xs):
         ax = axes[i, i]
         # Plot the histograms.
-        n, b, p = ax.hist(x, weights=weights, bins=kwargs.get("bins", 50),
-                          range=extents[i], histtype="step",
-                          color=kwargs.get("color", "k"))
-        if truths is not None:
-            ax.axvline(truths[i], color=truth_color)
+        if plot_hist:
+		n, b, p = ax.hist(x, weights=weights, bins=kwargs.get("bins", 50),
+				range=extents[i], histtype="step",
+				color=kwargs.get("color", "k"))
+		if truths is not None:
+			ax.axvline(truths[i], color=truth_color)
 
-        if truths_range is not None:
-	    ax.fill_betweenx(y=[0,1e6],x1=truths_range[i][0], x2=truths_range[i][1], color=truth_color, alpha=alpha, zorder=0)
+		if truths_range is not None:
+			ax.fill_betweenx(y=[0,1e6],x1=truths_range[i][0], x2=truths_range[i][1], color=truth_color, alpha=alpha, zorder=0)
+			
+		# Set up the axes.
+		ax.set_xlim(extents[i])
+		if scale_hist:
+			maxn = np.max(n)
+			ax.set_ylim(-0.1 * maxn, 1.1 * maxn)
+		else:
+			ax.set_ylim(0, 1.1 * np.max(n))
+			ax.set_yticklabels([])
+			ax.xaxis.set_major_locator(MaxNLocator(5))
 
         # Plot quantiles if wanted.
         if len(quantiles) > 0:
@@ -183,16 +197,6 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
             if verbose:
                 print("Quantiles:")
                 print(zip(quantiles, qvalues))
-
-        # Set up the axes.
-        ax.set_xlim(extents[i])
-        if scale_hist:
-            maxn = np.max(n)
-            ax.set_ylim(-0.1 * maxn, 1.1 * maxn)
-        else:
-            ax.set_ylim(0, 1.1 * np.max(n))
-        ax.set_yticklabels([])
-        ax.xaxis.set_major_locator(MaxNLocator(5))
 
 	# label offset
 	loff=-0.2-sin(radians(angle))/7.
@@ -213,6 +217,9 @@ def corner(xs, weights=None, labels=None, extents=None, truths=None,
                 ax.set_frame_on(False)
                 continue
             elif j == i:
+		if plot_hist==False:
+			ax.set_visible(False)
+			ax.set_frame_on(False)
                 continue
 
             hist2d(y, x, ax=ax, extent=[extents[j], extents[i]],
@@ -313,6 +320,7 @@ def hist2d(x, y, *args, **kwargs):
     plot_contours = kwargs.get("plot_contours", True)
     plot_hist2d = kwargs.get("plot_hist2d", True)
     nlevels = kwargs.get("nlevels", None)
+    levels = kwargs.get("levels", None)
     cmap = kwargs.get("cmap", None)
 
     if cmap==None:
@@ -331,18 +339,22 @@ def hist2d(x, y, *args, **kwargs):
                          "have no dynamic range. You could try using the "
                          "`extent` argument.")
 
-    V = 1.0 - np.exp(-0.5 * np.arange(0.5, 2.1, 0.5) ** 2)
+    if levels==None:
+        V = 1.0 - np.exp(-0.5 * np.arange(0.5, 2.1, 0.5) ** 2)
+    else:
+        V = levels
     Hflat = H.flatten()
     inds = np.argsort(Hflat)[::-1]
     Hflat = Hflat[inds]
     sm = np.cumsum(Hflat)
     sm /= sm[-1]
 
+    V_ = V*0
     for i, v0 in enumerate(V):
         try:
-            V[i] = Hflat[sm <= v0][-1]
+            V_[i] = Hflat[sm <= v0][-1]
         except:
-            V[i] = Hflat[0]
+            V_[i] = Hflat[0]
 
     X1, Y1 = 0.5 * (X[1:] + X[:-1]), 0.5 * (Y[1:] + Y[:-1])
     X, Y = X[:-1], Y[:-1]
@@ -351,16 +363,17 @@ def hist2d(x, y, *args, **kwargs):
         ax.plot(x, y, "o", color=color, ms=1.5, zorder=-1, alpha=0.1,
                 rasterized=True)
         if plot_contours:
-            ax.contourf(X1, Y1, H.T, [V[-1], H.max()],
+            ax.contourf(X1, Y1, H.T, [V_[-1], H.max()],
                         cmap=LinearSegmentedColormap.from_list("cmap", ([1] * 3, [1] * 3), N=2), antialiased=False)
 
     if plot_contours:
 	if plot_hist2d:
             ax.pcolor(X, Y, H.max() - H.T, cmap=cmap)
-        if nlevels==None:
-	    ax.contour(X1, Y1, H.T, V, colors=color, linewidths=linewidths)
+        if color!=None: cmap=None
+        if (nlevels==None):
+	    ax.contour(X1, Y1, H.T, np.sort(V_), colors=color, linewidths=linewidths, cmap=cmap)
 	elif nlevels>0:
-            ax.contour(X1, Y1, H.T, nlevels, colors=color, linewidths=linewidths)
+            ax.contour(X1, Y1, H.T, nlevels, colors=color, linewidths=linewidths, cmap=cmap)
 
     data = np.vstack([x, y])
     mu = np.mean(data, axis=1)
